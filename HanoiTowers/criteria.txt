@@ -1,0 +1,11 @@
+fitness: [0, 1]
+
+     1. Size of final tower [0, maxsize] 
+    -1. Number of ilegal moves [n]
+
+
+
+Activation function = Sigmoid.
+    Ilegal moves = log_2(ilegalmoves) 
+    卑towersize 
+
