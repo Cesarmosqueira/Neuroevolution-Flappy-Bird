@@ -127,7 +127,7 @@ def main():
         )
 
         # hitmask for player
-        HITMASKS['playr'] = (
+        HITMASKS['player'] = (
             getHitmask(IMAGES['player'][0]),
             getHitmask(IMAGES['player'][1]),
             getHitmask(IMAGES['player'][2]),

@@ -1,10 +1,9 @@
-from agent import cycle
 import random
-import sys
 import pygame
 from pygame.locals import *
-from agent import Brain
-import random
+from agent import *
+import time
+import genetic as gen
 
 
 FPS = 30
@@ -56,12 +55,11 @@ except NameError:
     xrange = range
 
 
-SAMPLE_SIZE = 10
-brains = [Brain(index) for index in range(SAMPLE_SIZE)]
-
-
+SAMPLE_SIZE = 500
 def main():
     global SCREEN, FPSCLOCK
+    global agents
+    agents = [Bird(ind) for ind in range(SAMPLE_SIZE)]
     pygame.init()
     FPSCLOCK = pygame.time.Clock()
     SCREEN = pygame.display.set_mode((SCREENWIDTH, SCREENHEIGHT))
@@ -102,7 +100,7 @@ def main():
     SOUNDS['point'] = pygame.mixer.Sound('assets/audio/point' + soundExt)
     SOUNDS['swoosh'] = pygame.mixer.Sound('assets/audio/swoosh' + soundExt)
     SOUNDS['wing'] = pygame.mixer.Sound('assets/audio/wing' + soundExt)
-
+    gen = 1
     while True:
         # select random background sprites
         randBg = random.randint(0, len(BACKGROUNDS_LIST) - 1)
@@ -142,10 +140,11 @@ def main():
                 getHitmask(IMAGES['player'][b][1]),
                 getHitmask(IMAGES['player'][b][2]),
             ))
+        print("Gen #", gen)
+        agents = mainGame(0)
+        gen += 1
 
-        movementInfo = showWelcomeAnimation()
-        crashInfo = mainGame(movementInfo)
-        showGameOverScreen(crashInfo)
+
 
 
 def showWelcomeAnimation():
@@ -156,9 +155,8 @@ def showWelcomeAnimation():
     #playerIndexGen = cycle([0, 1, 2, 1])
     # iterator used to change playerIndex after every 5th iteration
     #loopIter = 0
-
     # load pos to every brain
-    for b in brains:
+    for b in agents:
         b.x = int(SCREENWIDTH * 0.2)
         b.y = int((SCREENHEIGHT - IMAGES['player'][0][0].get_height()) / 2)
 
@@ -184,76 +182,77 @@ def showWelcomeAnimation():
                         0, 200, SCREENHEIGHT//30)
     for s in SOUNDS:
         SOUNDS[s].set_volume(0.0 if sound_off else 0.80)
+    autostart = 0
+    #while True:
+    #    autostart += 1
+    for event in pygame.event.get():
+        if event.type == QUIT or (event.type == KEYDOWN and event.key == K_ESCAPE):
+            pygame.quit()
+            sys.exit()
+        if event.type == KEYDOWN and (event.key == K_SPACE or event.key == K_UP):
+            SOUNDS['wing'].play()
+            return mainGame(basex)
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            mouse = pygame.mouse.get_pos()
+            if button_rectangle[0] <= mouse[0] <= button_rectangle[0]+button_rectangle[2] \
+                    and button_rectangle[1] <= mouse[1] <= button_rectangle[1]+button_rectangle[3]:
+                sound_off = not sound_off
+                for s in SOUNDS:
+                    SOUNDS[s].set_volume(0.0 if sound_off else 0.80)
+                text = smallfont.render(
+                    'SOUND OFF' if sound_off else "SOUND ON", True, (0, 51, 0))
 
-    while True:
-        for event in pygame.event.get():
-            if event.type == QUIT or (event.type == KEYDOWN and event.key == K_ESCAPE):
-                pygame.quit()
-                sys.exit()
-            if event.type == KEYDOWN and (event.key == K_SPACE or event.key == K_UP):
-                # make first flap sound and return values for mainGame
-                SOUNDS['wing'].play()
-                return basex
+    if 20 < autostart:
+            # make first flap sound and return values for mainGame
+        SOUNDS['wing'].play()
+    # draw background
+    SCREEN.blit(IMAGES['background'], (0, 0))
 
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                if button_rectangle[0] <= mouse[0] <= button_rectangle[0]+button_rectangle[2] \
-                        and button_rectangle[1] <= mouse[1] <= button_rectangle[1]+button_rectangle[3]:
-                    sound_off = not sound_off
-                    for s in SOUNDS:
-                        SOUNDS[s].set_volume(0.0 if sound_off else 0.80)
-                    text = smallfont.render(
-                        'SOUND OFF' if sound_off else "SOUND ON", True, (0, 51, 0))
+    # to all the players
+    # adjust playery, playerIndex, basex
+    # and draw them
+    for b in agents:
+        if (b.loopIter + 1) % 5 == 0:
+            b.index = next(b.indexGen)
+        b.loopIter = (b.loopIter + 1) % 30
+        b.playerShm()
+        # draw sprites
+        SCREEN.blit(IMAGES['player'][b.GLOBAL_INDEX][b.index],(b.x, b.y + b.playerShmVals['val']))
 
-        # draw background
-        SCREEN.blit(IMAGES['background'], (0, 0))
+    # move the base and draw it with the message
+    basex = -((-basex + 4) % baseShift)
+    SCREEN.blit(IMAGES['message'], (messagex, messagey))
+    SCREEN.blit(IMAGES['base'], (basex, BASEY))
 
-        # to all the players
-        # adjust playery, playerIndex, basex
-        # and draw them
-        for b in brains:
-            if (b.loopIter + 1) % 5 == 0:
-                b.index = next(b.indexGen)
-            b.loopIter = (b.loopIter + 1) % 30
-            b.playerShm()
-            # draw sprites
-            SCREEN.blit(IMAGES['player'][b.GLOBAL_INDEX][b.index],
-                        (b.x, b.y + b.playerShmVals['val']))
+    # draw volume button
+    # if mouse is hovered on a button it
 
-        # move the base and draw it with the message
-        basex = -((-basex + 4) % baseShift)
-        SCREEN.blit(IMAGES['message'], (messagex, messagey))
-        SCREEN.blit(IMAGES['base'], (basex, BASEY))
+    mouse = pygame.mouse.get_pos()
 
-        # draw volume button
-        # if mouse is hovered on a button it
+    # VOLUME CONTROL
+    # if mouse is hovered on a button it
+    # changes to lighter shade
+    if button_rectangle[0] <= mouse[0] <= button_rectangle[0]+button_rectangle[2] \
+            and button_rectangle[1] <= mouse[1] <= button_rectangle[1]+button_rectangle[3]:
+        pygame.draw.rect(SCREEN, button_color_dark, button_rectangle)
 
-        mouse = pygame.mouse.get_pos()
+    else:
+        pygame.draw.rect(SCREEN, button_color_light, button_rectangle)
 
-        # VOLUME CONTROL
-        # if mouse is hovered on a button it
-        # changes to lighter shade
-        if button_rectangle[0] <= mouse[0] <= button_rectangle[0]+button_rectangle[2] \
-                and button_rectangle[1] <= mouse[1] <= button_rectangle[1]+button_rectangle[3]:
-            pygame.draw.rect(SCREEN, button_color_dark, button_rectangle)
+    # superimposing the text onto our button
+    SCREEN.blit(text, (button_rectangle[:2]))
 
-        else:
-            pygame.draw.rect(SCREEN, button_color_light, button_rectangle)
-
-        # superimposing the text onto our button
-        SCREEN.blit(text, (button_rectangle[:2]))
-
-        pygame.display.update()
-        FPSCLOCK.tick(FPS)
+    pygame.display.update()
+    FPSCLOCK.tick(FPS)
 
 
 def mainGame(basex):
+    global FPS
 
-    for ind in range(len(brains)):
-        way = brains[ind].y + brains[ind].playerShmVals['val']
-        brains[ind].__init__(ind)
-        brains[ind].x = int(SCREENWIDTH*0.2)
-        brains[ind].y = way
-        brains[ind].reload()
+    for ind in range(len(agents)):
+        agents[ind].reload()
+        agents[ind].x = int(SCREENWIDTH * 0.2)
+        agents[ind].y = int((SCREENHEIGHT - IMAGES['player'][0][0].get_height()) / 2)
 
     baseShift = IMAGES['base'].get_width() - IMAGES['background'].get_width()
 
@@ -285,7 +284,8 @@ def mainGame(basex):
     # playerRotThr = 20   # rotation threshold
     # playerFlapAcc = -9   # players speed on flapping
     # playerFlapped = False  # True when player flaps
-
+    OVER = False
+    BEGINING = time.time()
     while True:
         for event in pygame.event.get():
             if event.type == QUIT or (event.type == KEYDOWN and event.key == K_ESCAPE):
@@ -293,43 +293,49 @@ def mainGame(basex):
                 sys.exit()
             # jump controlls must be called from each brain
             if event.type == KEYDOWN and (event.key == K_SPACE or event.key == K_UP):
-                for b in brains:
-                    if b.y > -2 * IMAGES['player'][b.GLOBAL_INDEX][0].get_height():
-                        b.flap_flap()
-                        SOUNDS['wing'].play()
+                if agents[0].y > -2 * IMAGES['player'][b.GLOBAL_INDEX][0].get_height():
+                    agents[0].flap_flap()
+                    SOUNDS['wing'].play()
+            if event.type == KEYDOWN and event.key == K_s:
+                best_bird = max(agents, key = lambda b: b.score)
+                print("Gnome code saved at 'out/'")
+                best_bird.describe()
+            if event.type == KEYDOWN and event.key == K_j:
+                FPS -= 5
+                print(f"FPS: {FPS}. default =30")
+            if event.type == KEYDOWN and event.key == K_k:
+                FPS += 5
+                print(f"FPS: {FPS}. default =30")
 
-        for b in brains:
-            if random.randint(0, 1000) < 100:
+        for b in agents:
+            if b.done:
+                continue
+            npipe = b.PIPE_INDEX
+            npx = lowerPipes[npipe]['x']
+            npy = lowerPipes[npipe]['y']-PIPEGAPSIZE
+            if b.think_move(npx, npy, SCREENWIDTH, SCREENHEIGHT):
                 b.flap_flap()
-        # check for crash here
-        # for every bird
-        # if some has crashed
-        # 'FOR NOW' the game ends
-        # Later, we'll call crash info as a separate thread
-        # and execute the game over animation for a single bird
-        # until sample is over.
-        for b in brains:
-            crashTest = checkCrash({'x': b.x, 'y': b.y, 'index': b.index},
-                                   upperPipes, lowerPipes, b.GLOBAL_INDEX)
-            if crashTest[0]:
-                return {
-                    'brain': b,
-                    'groundCrash': crashTest[1],
-                    'basex': basex,
-                    'upperPipes': upperPipes,
-                    'lowerPipes': lowerPipes
-                }
-
-        # move base
-        basex = -((-basex + 100) % baseShift)
+        for b in agents:
+            if not b.done: 
+                crashTest = checkCrash({'x': b.x, 'y': b.y, 'index': b.index}, upperPipes, lowerPipes, b.GLOBAL_INDEX)
+                if crashTest[0]:
+                    end = time.time() - BEGINING
+                    b.fitness = end #time alive
+                    b.done = True
+                    npy = lowerPipes[b.PIPE_INDEX]['y']-PIPEGAPSIZE
+                    b.died_at = b.y
+                    b.fitness -= abs(npy - b.y) / SCREENHEIGHT
+                    b.groundCrash = 1 if crashTest[1] else -1
+        
         # apply for entire sample
-        for b in brains:
+        for b in agents:
             # check for score
             playerMidPos = b.x + \
                 IMAGES['player'][b.GLOBAL_INDEX][0].get_width() / 2
             for pipe in upperPipes:
                 pipeMidPos = pipe['x'] + IMAGES['pipe'][0].get_width() / 2
                 if pipeMidPos <= playerMidPos < pipeMidPos + 4:
+                    b.PIPE_INDEX += 1
                     b.score += 1
                     SOUNDS['point'].play()
 
@@ -338,98 +344,99 @@ def mainGame(basex):
                 b.index = next(b.indexGen)
             b.loopIter = (b.loopIter + 1) % 30
 
+
             spriteH = IMAGES['player'][b.GLOBAL_INDEX][b.index].get_height()
-            b.process_movement(spriteH, BASEY)
-
+            if not b.done: b.process_movement(spriteH, BASEY)
+            else: 
+                b.process_death(spriteH, BASEY, baseShift)
+                
         # NO PLAYER HERE
-        # move pipes to left
-        for uPipe, lPipe in zip(upperPipes, lowerPipes):
-            uPipe['x'] += pipeVelX
-            lPipe['x'] += pipeVelX
-
-        # add new pipe when first pipe is about to touch left of screen
-        if len(upperPipes) > 0 and 0 < upperPipes[0]['x'] < 5:
-            newPipe = getRandomPipe()
-            upperPipes.append(newPipe[0])
-            lowerPipes.append(newPipe[1])
-
-        # remove first pipe if its out of the screen
-        if len(upperPipes) > 0 and upperPipes[0]['x'] < -IMAGES['pipe'][0].get_width():
-            upperPipes.pop(0)
-            lowerPipes.pop(0)
-
-        # draw sprites
-        SCREEN.blit(IMAGES['background'], (0, 0))
-
-        for uPipe, lPipe in zip(upperPipes, lowerPipes):
-            SCREEN.blit(IMAGES['pipe'][0], (uPipe['x'], uPipe['y']))
-            SCREEN.blit(IMAGES['pipe'][1], (lPipe['x'], lPipe['y']))
-
-        SCREEN.blit(IMAGES['base'], (basex, BASEY))
-
         # UNTIL HERE
-        # print score so player overlaps the score
-        showScore(len(brains))
-        for b in brains:
-            # Player rotation has a threshold
-            visibleRot = b.playerRotThr
-            if b.playerRot <= b.playerRotThr:
-                visibleRot = b.playerRot
 
-            playerSurface = pygame.transform.rotate(
-                IMAGES['player'][b.GLOBAL_INDEX][b.index], visibleRot)
-            SCREEN.blit(playerSurface, (b.x, b.y))
+        over = all(b.done for b in agents)
+        if over:
+            total_time = time.time() - BEGINING
+            #SCREEN.blit(IMAGES['base'], (basex, BASEY))
+            SCREEN.blit(IMAGES['background'], (0, 0))
+            for uPipe, lPipe in zip(upperPipes, lowerPipes):
+                SCREEN.blit(IMAGES['pipe'][0], (uPipe['x'], uPipe['y']))
+                SCREEN.blit(IMAGES['pipe'][1], (lPipe['x'], lPipe['y']))
+
+            SCREEN.blit(IMAGES['base'], (basex, BASEY))
+
+            for b in agents:
+                b.over = True
+                # Player rotation has a threshold
+                visibleRot = b.playerRotThr
+                if b.playerRot <= b.playerRotThr:
+                    visibleRot = b.playerRot
+                if not b.done:
+                    playerSurface = pygame.transform.rotate(
+                        IMAGES['player'][b.GLOBAL_INDEX][b.index], visibleRot)
+                    SCREEN.blit(playerSurface, (b.x, b.y))
+                else:
+                    playerSurface = pygame.transform.rotate(
+                        IMAGES['player'][b.GLOBAL_INDEX][1], b.playerRot)
+                    SCREEN.blit(playerSurface, (b.x, b.y))
+            SCREEN.blit(IMAGES['gameover'], (50, 180))
+            if all(b.dead for b in agents):
+                agents.sort(key= lambda b: b.fitness)
+                print(f"done after {round(total_time,2)}s aprox")
+                return gen.get_new_population(agents)
+                #return [Bird(ind, False) for ind in range(SAMPLE_SIZE)]
+
+        else: 
+            # move base
+            basex = -((-basex + 100) % baseShift)
+            # move pipes to left
+            for uPipe, lPipe in zip(upperPipes, lowerPipes):
+                uPipe['x'] += pipeVelX
+                lPipe['x'] += pipeVelX
+
+            # add new pipe when first pipe is about to touch left of screen
+            if len(upperPipes) > 0 and 0 < upperPipes[0]['x'] < 5:
+                newPipe = getRandomPipe()
+                upperPipes.append(newPipe[0])
+                lowerPipes.append(newPipe[1])
+
+            # remove first pipe if its out of the screen
+            if len(upperPipes) > 0 and upperPipes[0]['x'] < -IMAGES['pipe'][0].get_width():
+                for b in agents: b.PIPE_INDEX -= 1
+                upperPipes.pop(0)
+                lowerPipes.pop(0)
+                
+            # draw sprites
+            SCREEN.blit(IMAGES['background'], (0, 0))
+
+            for uPipe, lPipe in zip(upperPipes, lowerPipes):
+                SCREEN.blit(IMAGES['pipe'][0], (uPipe['x'], uPipe['y']))
+                SCREEN.blit(IMAGES['pipe'][1], (lPipe['x'], lPipe['y']))
+
+            SCREEN.blit(IMAGES['base'], (basex, BASEY))
+
+            # print score so player overlaps the score
+            maxscore = max(agents, key = lambda b: b.score).score
+            showScore(maxscore)
+            for b in agents:
+                if b.x < -10: continue
+                # Player rotation has a threshold
+                visibleRot = b.playerRotThr
+                if b.playerRot <= b.playerRotThr:
+                    visibleRot = b.playerRot
+                if not b.done:
+                    playerSurface = pygame.transform.rotate(
+                        IMAGES['player'][b.GLOBAL_INDEX][b.index], visibleRot)
+                    SCREEN.blit(playerSurface, (b.x, b.y))
+                else:
+                    playerSurface = pygame.transform.rotate(
+                        IMAGES['player'][b.GLOBAL_INDEX][1], b.playerRot)
+                    SCREEN.blit(playerSurface, (b.x, b.y))
+
+
+
 
         pygame.display.update()
         FPSCLOCK.tick(FPS)
-
-
-def showGameOverScreen(crashInfo):
-    """crashes the player down ans shows gameover image"""
-    brain = crashInfo['brain']
-    basex = crashInfo['basex']
-    upperPipes, lowerPipes = crashInfo['upperPipes'], crashInfo['lowerPipes']
-    spriteH = IMAGES['player'][brain.GLOBAL_INDEX][brain.index].get_height()
-
-    # play hit and die sounds
-    SOUNDS['hit'].play()
-    if not crashInfo['groundCrash']:
-        SOUNDS['die'].play()
-
-    while True:
-        if brain.y + spriteH >= BASEY - 1:
-            return
-
-        # player y shift
-        if brain.y + spriteH < BASEY - 1:
-            brain.y += min(brain.playerVelY, BASEY - brain.y - spriteH)
-
-        # player velocity change
-        if brain.playerVelY < 15:
-            brain.playerVelY += brain.playerAccY
-
-        # rotate only when it's a pipe crash
-        if not crashInfo['groundCrash']:
-            if brain.playerRot > -90:
-                brain.playerRot -= brain.playerVelRot
-
-        # draw sprites
-        SCREEN.blit(IMAGES['background'], (0, 0))
-
-        for uPipe, lPipe in zip(upperPipes, lowerPipes):
-            SCREEN.blit(IMAGES['pipe'][0], (uPipe['x'], uPipe['y']))
-            SCREEN.blit(IMAGES['pipe'][1], (lPipe['x'], lPipe['y']))
-
-        SCREEN.blit(IMAGES['base'], (basex, BASEY))
-        showScore(brain.score)
-
-        playerSurface = pygame.transform.rotate(
-            IMAGES['player'][brain.GLOBAL_INDEX][1], brain.playerRot)
-        SCREEN.blit(playerSurface, (brain.x, brain.y))
-        SCREEN.blit(IMAGES['gameover'], (50, 180))
-
-        FPSCLOCK.tick(FPS)
-        pygame.display.update()
 
 
 # def playerShm(playerShm):
@@ -453,7 +460,7 @@ def getRandomPipe():
 
     return [
         {'x': pipeX, 'y': gapY - pipeHeight},  # upper pipe
-        {'x': pipeX, 'y': gapY + PIPEGAPSIZE},  # lower pipe
+        {'x': pipeX, 'y': gapY + PIPEGAPSIZE},  # lower pipeA
     ]
 
 
