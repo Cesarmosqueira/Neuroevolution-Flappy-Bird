@@ -16,7 +16,7 @@ def get_new_population(birds):
     new_pop = []
     for _ in range(len(birds)):
         new_brain = random.choice(best_2).brain.copy() ##chose a brain from the best genomes
-        new_brain.mutate(0.01 if random.uniform(0,1) < 0.05 else 0.1) ## mutate brain 
+        new_brain.mutate(0.01 if random.uniform(0,1) < 0.001 else 1) ## mutate brain 
         new_bird = Bird(_) ## create a regular bird with random brain
         new_bird.brain = new_brain #replace its brain xd
         new_pop.append(new_bird)

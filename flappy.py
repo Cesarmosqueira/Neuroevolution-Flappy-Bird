@@ -13,6 +13,7 @@ PIPEGAPSIZE = 100  # gap between upper and lower part of pipe
 BASEY = SCREENHEIGHT * 0.79
 # image, sound and hitmask  dicts
 IMAGES, SOUNDS, HITMASKS = {}, {}, {}
+GLOBAL_DRAW = True
 
 # list of all possible players (tuple of 3 positions of flap)
 PLAYERS_LIST = (
@@ -206,7 +207,7 @@ def showWelcomeAnimation():
             # make first flap sound and return values for mainGame
         SOUNDS['wing'].play()
     # draw background
-    SCREEN.blit(IMAGES['background'], (0, 0))
+    if GLOBAL_DRAW: SCREEN.blit(IMAGES['background'], (0, 0))
 
     # to all the players
     # adjust playery, playerIndex, basex
@@ -217,12 +218,12 @@ def showWelcomeAnimation():
         b.loopIter = (b.loopIter + 1) % 30
         b.playerShm()
         # draw sprites
-        SCREEN.blit(IMAGES['player'][b.GLOBAL_INDEX][b.index],(b.x, b.y + b.playerShmVals['val']))
+        if GLOBAL_DRAW: SCREEN.blit(IMAGES['player'][b.GLOBAL_INDEX][b.index],(b.x, b.y + b.playerShmVals['val']))
 
     # move the base and draw it with the message
     basex = -((-basex + 4) % baseShift)
-    SCREEN.blit(IMAGES['message'], (messagex, messagey))
-    SCREEN.blit(IMAGES['base'], (basex, BASEY))
+    if GLOBAL_DRAW: SCREEN.blit(IMAGES['message'], (messagex, messagey))
+    if GLOBAL_DRAW: SCREEN.blit(IMAGES['base'], (basex, BASEY))
 
     # draw volume button
     # if mouse is hovered on a button it
@@ -240,14 +241,16 @@ def showWelcomeAnimation():
         pygame.draw.rect(SCREEN, button_color_light, button_rectangle)
 
     # superimposing the text onto our button
-    SCREEN.blit(text, (button_rectangle[:2]))
+    if GLOBAL_DRAW: SCREEN.blit(text, (button_rectangle[:2]))
 
-    pygame.display.update()
-    FPSCLOCK.tick(FPS)
+    if GLOBAL_DRAW:
+        pygame.display.update()
+        FPSCLOCK.tick(FPS)
 
 
 def mainGame(basex):
     global FPS
+    global GLOBAL_DRAW
     for s in SOUNDS:
         SOUNDS[s].set_volume(0.0)
     for ind in range(len(agents)):
@@ -292,6 +295,20 @@ def mainGame(basex):
             if event.type == QUIT or (event.type == KEYDOWN and event.key == K_ESCAPE):
                 pygame.quit()
                 sys.exit()
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                print("Mouse is at", pygame.mouse.get_pos())
+                avg = 0
+                for b in agents:
+                    avg += get_next_pipe(lowerPipes, b.x)
+                avg /= SAMPLE_SIZE
+                print(f"And next pipe on agents is {avg} on average")
+                if avg.is_integer():
+                    pipe = lowerPipes[get_next_pipe(lowerPipes, b.x)]
+                    gapY = pipe['y'] - (PIPEGAPSIZE / 2)
+                    xpos = pipe['x']
+                    print(f"Pipe pos(x,y) = ({xpos}, {gapY})")
+
+
             # jump controlls must be called from each brain
             if event.type == KEYDOWN and (event.key == K_SPACE or event.key == K_UP):
                 if agents[0].y > -2 * IMAGES['player'][b.GLOBAL_INDEX][0].get_height():
@@ -307,13 +324,16 @@ def mainGame(basex):
             if event.type == KEYDOWN and event.key == K_k:
                 FPS += 5
                 print(f"FPS: {FPS}. default =30")
+            if event.type == KEYDOWN and event.key == K_d:
+                GLOBAL_DRAW = not GLOBAL_DRAW
 
         for b in agents:
             if b.done:
                 continue
             pipe = lowerPipes[get_next_pipe(lowerPipes, b.x)]
-            gapY = pipe['y'] + (PIPEGAPSIZE / 2)
-            if b.think_move(pipe['x'], gapY, SCREENWIDTH, SCREENHEIGHT):
+            gapY = pipe['y'] - (PIPEGAPSIZE / 2)
+            xpos = pipe['x']
+            if b.think_move(xpos, gapY, SCREENWIDTH, SCREENHEIGHT):
                 b.flap_flap()
         for b in agents:
             if not b.done: 
@@ -322,8 +342,9 @@ def mainGame(basex):
                     end = time.time() - BEGINING
                     b.fitness = end #time alive
                     b.done = True
-                    npi = get_next_pipe(lowerPipes, b.x)
-                    gapY = lowerPipes[npi]['y']- (PIPEGAPSIZE/2)
+                    pipe = lowerPipes[get_next_pipe(lowerPipes, b.x)]
+                    gapY = pipe['y'] - (PIPEGAPSIZE / 2)
+                    #xpos = pipe['x']
                     b.died_at = b.y
                     b.fitness -= abs(gapY- b.y)  / SCREENHEIGHT
                     b.groundCrash = 1 if crashTest[1] else -1
@@ -356,13 +377,13 @@ def mainGame(basex):
         over = all(b.done for b in agents)
         if over:
             total_time = time.time() - BEGINING
-            #SCREEN.blit(IMAGES['base'], (basex, BASEY))
-            SCREEN.blit(IMAGES['background'], (0, 0))
+            #if GLOBAL_DRAW: SCREEN.blit(IMAGES['base'], (basex, BASEY))
+            if GLOBAL_DRAW: SCREEN.blit(IMAGES['background'], (0, 0))
             for uPipe, lPipe in zip(upperPipes, lowerPipes):
-                SCREEN.blit(IMAGES['pipe'][0], (uPipe['x'], uPipe['y']))
-                SCREEN.blit(IMAGES['pipe'][1], (lPipe['x'], lPipe['y']))
+                if GLOBAL_DRAW: SCREEN.blit(IMAGES['pipe'][0], (uPipe['x'], uPipe['y']))
+                if GLOBAL_DRAW: SCREEN.blit(IMAGES['pipe'][1], (lPipe['x'], lPipe['y']))
 
-            SCREEN.blit(IMAGES['base'], (basex, BASEY))
+            if GLOBAL_DRAW: SCREEN.blit(IMAGES['base'], (basex, BASEY))
 
             for b in agents:
                 b.over = True
@@ -373,14 +394,13 @@ def mainGame(basex):
                 if not b.done:
                     playerSurface = pygame.transform.rotate(
                         IMAGES['player'][b.GLOBAL_INDEX][b.index], visibleRot)
-                    SCREEN.blit(playerSurface, (b.x, b.y))
+                    if GLOBAL_DRAW: SCREEN.blit(playerSurface, (b.x, b.y))
                 else:
                     playerSurface = pygame.transform.rotate(
                         IMAGES['player'][b.GLOBAL_INDEX][1], b.playerRot)
-                    SCREEN.blit(playerSurface, (b.x, b.y))
-            SCREEN.blit(IMAGES['gameover'], (50, 180))
+                    if GLOBAL_DRAW: SCREEN.blit(playerSurface, (b.x, b.y))
+            if GLOBAL_DRAW: SCREEN.blit(IMAGES['gameover'], (50, 180))
             if all(b.dead for b in agents):
-                agents.sort(key= lambda b: b.fitness)
                 print(f"done after {round(total_time,2)}s aprox")
                 return gen.get_new_population(agents)
                 #return [Bird(ind, False) for ind in range(SAMPLE_SIZE)]
@@ -405,13 +425,13 @@ def mainGame(basex):
                 lowerPipes.pop(0)
                 
             # draw sprites
-            SCREEN.blit(IMAGES['background'], (0, 0))
+            if GLOBAL_DRAW: SCREEN.blit(IMAGES['background'], (0, 0))
 
             for uPipe, lPipe in zip(upperPipes, lowerPipes):
-                SCREEN.blit(IMAGES['pipe'][0], (uPipe['x'], uPipe['y']))
-                SCREEN.blit(IMAGES['pipe'][1], (lPipe['x'], lPipe['y']))
+                if GLOBAL_DRAW: SCREEN.blit(IMAGES['pipe'][0], (uPipe['x'], uPipe['y']))
+                if GLOBAL_DRAW: SCREEN.blit(IMAGES['pipe'][1], (lPipe['x'], lPipe['y']))
 
-            SCREEN.blit(IMAGES['base'], (basex, BASEY))
+            if GLOBAL_DRAW: SCREEN.blit(IMAGES['base'], (basex, BASEY))
 
             # print score so player overlaps the score
             maxscore = max(agents, key = lambda b: b.score).score
@@ -425,17 +445,18 @@ def mainGame(basex):
                 if not b.done:
                     playerSurface = pygame.transform.rotate(
                         IMAGES['player'][b.GLOBAL_INDEX][b.index], visibleRot)
-                    SCREEN.blit(playerSurface, (b.x, b.y))
+                    if GLOBAL_DRAW: SCREEN.blit(playerSurface, (b.x, b.y))
                 else:
                     playerSurface = pygame.transform.rotate(
                         IMAGES['player'][b.GLOBAL_INDEX][1], b.playerRot)
-                    SCREEN.blit(playerSurface, (b.x, b.y))
+                    if GLOBAL_DRAW: SCREEN.blit(playerSurface, (b.x, b.y))
 
 
 
 
-        pygame.display.update()
-        FPSCLOCK.tick(FPS)
+        if GLOBAL_DRAW:
+            pygame.display.update()
+            FPSCLOCK.tick(FPS)
 
 
 # def playerShm(playerShm):
@@ -478,7 +499,7 @@ def showScore(score):
     Xoffset = (SCREENWIDTH - totalWidth) / 2
 
     for digit in scoreDigits:
-        SCREEN.blit(IMAGES['numbers'][digit], (Xoffset, SCREENHEIGHT * 0.1))
+        if GLOBAL_DRAW: SCREEN.blit(IMAGES['numbers'][digit], (Xoffset, SCREENHEIGHT * 0.1))
         Xoffset += IMAGES['numbers'][digit].get_width()
 
 
