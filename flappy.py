@@ -55,7 +55,7 @@ except NameError:
     xrange = range
 
 
-SAMPLE_SIZE = 500
+SAMPLE_SIZE = 340
 def main():
     global SCREEN, FPSCLOCK
     global agents
@@ -248,7 +248,8 @@ def showWelcomeAnimation():
 
 def mainGame(basex):
     global FPS
-
+    for s in SOUNDS:
+        SOUNDS[s].set_volume(0.0)
     for ind in range(len(agents)):
         agents[ind].reload()
         agents[ind].x = int(SCREENWIDTH * 0.2)
@@ -310,10 +311,9 @@ def mainGame(basex):
         for b in agents:
             if b.done:
                 continue
-            npipe = b.PIPE_INDEX
-            npx = lowerPipes[npipe]['x']
-            npy = lowerPipes[npipe]['y']-PIPEGAPSIZE
-            if b.think_move(npx, npy, SCREENWIDTH, SCREENHEIGHT):
+            pipe = lowerPipes[get_next_pipe(lowerPipes, b.x)]
+            gapY = pipe['y'] + (PIPEGAPSIZE / 2)
+            if b.think_move(pipe['x'], gapY, SCREENWIDTH, SCREENHEIGHT):
                 b.flap_flap()
         for b in agents:
             if not b.done: 
@@ -322,9 +322,10 @@ def mainGame(basex):
                     end = time.time() - BEGINING
                     b.fitness = end #time alive
                     b.done = True
-                    npy = lowerPipes[b.PIPE_INDEX]['y']-PIPEGAPSIZE
+                    npi = get_next_pipe(lowerPipes, b.x)
+                    gapY = lowerPipes[npi]['y']- (PIPEGAPSIZE/2)
                     b.died_at = b.y
-                    b.fitness -= abs(npy - b.y) / SCREENHEIGHT
+                    b.fitness -= abs(gapY- b.y)  / SCREENHEIGHT
                     b.groundCrash = 1 if crashTest[1] else -1
         
         # apply for entire sample
@@ -335,7 +336,6 @@ def mainGame(basex):
             for pipe in upperPipes:
                 pipeMidPos = pipe['x'] + IMAGES['pipe'][0].get_width() / 2
                 if pipeMidPos <= playerMidPos < pipeMidPos + 4:
-                    b.PIPE_INDEX += 1
                     b.score += 1
                     SOUNDS['point'].play()
 
@@ -401,7 +401,6 @@ def mainGame(basex):
 
             # remove first pipe if its out of the screen
             if len(upperPipes) > 0 and upperPipes[0]['x'] < -IMAGES['pipe'][0].get_width():
-                for b in agents: b.PIPE_INDEX -= 1
                 upperPipes.pop(0)
                 lowerPipes.pop(0)
                 
@@ -416,7 +415,7 @@ def mainGame(basex):
 
             # print score so player overlaps the score
             maxscore = max(agents, key = lambda b: b.score).score
-            showScore(maxscore)
+            showScore(maxscore if 0 <= maxscore else 0)
             for b in agents:
                 if b.x < -10: continue
                 # Player rotation has a threshold
@@ -449,7 +448,11 @@ def mainGame(basex):
 #    else:
 #        playerShm['val'] -= 1
 
-
+def get_next_pipe(pipes, x):
+    for i in range(len(pipes)):
+        if x <= pipes[i]['x']: return i
+    raise Exception("asdasd")
+    return -10
 def getRandomPipe():
     """returns a randomly generated pipe"""
     # y of gap between upper and lower pipe

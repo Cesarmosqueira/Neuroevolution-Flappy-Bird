@@ -17,7 +17,6 @@ class Bird:
     died_at = 0
     dead = False
     fitnes = 0
-    PIPE_INDEX = 0
     done = False
     groundCrash = 0 #-1 = false 1 = true
     over = False
@@ -35,7 +34,7 @@ class Bird:
         self.y = -1
         self.playerShmVals = {'val': 0, 'dir': 1}
         self.GLOBAL_INDEX = ind
-        self.brain = nn.neural_network(2, 4, 1) 
+        self.brain = nn.neural_network(3, 1, 1) ##input = dx, dy, y
         return
 
     def describe(self):
@@ -71,7 +70,6 @@ class Bird:
         self.died_at = 0
         self.dead = False
         self.fitnes = 0
-        self.PIPE_INDEX = 0
 
         #updt
         self.score = 0
@@ -92,13 +90,14 @@ class Bird:
         self.playerVelY = self.playerFlapAcc
         self.playerFlapped = True
 
-    def think_move(self, pipe_x, pipe_y, SCREENWIDTH, SCREENHEIGHT):
+    def think_move(self, pipe_x, gapY, SCREENWIDTH, SCREENHEIGHT):
         if self.over or self.done or self.y < -100: return
-        dif_x = pipe_x - self.x
-        dif_y = pipe_y - self.y
-        p = self.brain.predict([dif_x, dif_y])[0]
-
-        return 0.7 < p
+        ##input = dx, dy, y
+        dif_x = (pipe_x - self.x) / SCREENWIDTH
+        dif_y = (gapY - self.y) / SCREENHEIGHT
+        pos_y = self.y / SCREENHEIGHT
+        p = self.brain.predict([dif_x, dif_y, pos_y])[0]
+        return 0.8 < p
 
     def display(self):
         print("Variables:")
