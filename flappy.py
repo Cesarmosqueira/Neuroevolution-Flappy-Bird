@@ -56,7 +56,7 @@ except NameError:
     xrange = range
 
 
-SAMPLE_SIZE = 340
+SAMPLE_SIZE = 200
 def main():
     global SCREEN, FPSCLOCK
     global agents
